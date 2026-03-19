@@ -28,22 +28,36 @@ fun BottomNavBar(navController: NavController) {
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        NavItem(Icons.Default.DateRange, "Calendar", true) { }
-        NavItem(Icons.Default.BarChart, "Analytics", false) { }
+        // 1. Calendar Button
+        NavItem(Icons.Default.DateRange, "Calendar", false) {
+            navController.navigate("calendar")
+        }
 
-        // Center Create Button
+        // 2. Analytics Button
+        NavItem(Icons.Default.BarChart, "Analytics", false) {
+            navController.navigate("analytics")
+        }
+
+        // 3. Center Create Button (The big teal one)
         Box(
             modifier = Modifier
                 .size(50.dp)
                 .background(Color(0xFF5AB9C1), RoundedCornerShape(12.dp))
-                .clickable { /* Action */ },
+                .clickable { navController.navigate("create_post") }, // Action connected!
             contentAlignment = Alignment.Center
         ) {
             Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(30.dp))
         }
 
-        NavItem(Icons.Default.Groups, "Community", false) { }
-        NavItem(Icons.Default.Person, "Profile", false) { }
+        // 4. Community Button
+        NavItem(Icons.Default.Groups, "Community", false) {
+            navController.navigate("community")
+        }
+
+        // 5. Profile Button
+        NavItem(Icons.Default.Person, "Profile", false) {
+            navController.navigate("profile")
+        }
     }
 }
 

@@ -10,9 +10,11 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBackIos
+import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -24,14 +26,23 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.example.planner.R
 import com.example.planner.components.BottomNavBar
+import java.time.YearMonth
+import java.time.format.TextStyle
+import java.util.Locale
 
 @Composable
 fun CalendarScreen(navController: NavController) {
+    // 1. State for Month Navigation (Requires minSdk 26)
+    var currentMonth by remember { mutableStateOf(YearMonth.of(2026, 3)) }
+
+    // 2. Scheduled days (These will be highlighted in Cyber-Teal)
+    val scheduledDays = setOf(23, 25)
+
     Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF002B36), Color(0xFF005F73))))) {
         Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
             Spacer(modifier = Modifier.height(40.dp))
 
-            // Header Section
+            // App Header
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Image(painter = painterResource(id = R.drawable.logo), contentDescription = null, modifier = Modifier.size(40.dp))
@@ -53,7 +64,23 @@ fun CalendarScreen(navController: NavController) {
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Text("MARCH 2026", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+
+                        // MONTH NAVIGATION
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(onClick = { currentMonth = currentMonth.minusMonths(1) }) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBackIos, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                            }
+                            Text(
+                                text = "${currentMonth.month.getDisplayName(TextStyle.FULL, Locale.ENGLISH).uppercase()} ${currentMonth.year}",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 18.sp
+                            )
+                            IconButton(onClick = { currentMonth = currentMonth.plusMonths(1) }) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowForwardIos, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                            }
+                        }
+
                         Row {
                             IconButton(onClick = { navController.navigate("notifications") }) {
                                 Icon(Icons.Default.Notifications, contentDescription = null, tint = Color.White)
@@ -66,20 +93,33 @@ fun CalendarScreen(navController: NavController) {
 
                     Spacer(modifier = Modifier.height(10.dp))
 
+                    // DYNAMIC CALENDAR GRID
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(7),
-                        modifier = Modifier.height(200.dp),
+                        modifier = Modifier.height(220.dp),
                         userScrollEnabled = false
                     ) {
-                        items(31) { index ->
+                        items(currentMonth.lengthOfMonth()) { index ->
+                            val dayNumber = index + 1
+                            // Highlight if it's in our scheduledDays list
+                            val isSelected = scheduledDays.contains(dayNumber) && currentMonth.monthValue == 3
+
                             Box(
                                 modifier = Modifier
-                                    .padding(2.dp)
+                                    .padding(4.dp)
                                     .aspectRatio(1f)
-                                    .background(if (index == 22) Color(0xFF5AB9C1) else Color.White.copy(alpha = 0.05f), RoundedCornerShape(8.dp)),
+                                    .background(
+                                        color = if (isSelected) Color(0xFF5AB9C1) else Color.White.copy(alpha = 0.05f),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text("${index + 1}", color = if (index == 22) Color.Black else Color.White, fontSize = 12.sp)
+                                Text(
+                                    text = "$dayNumber",
+                                    color = if (isSelected) Color(0xFF002B36) else Color.White,
+                                    fontSize = 14.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                )
                             }
                         }
                     }
@@ -88,7 +128,7 @@ fun CalendarScreen(navController: NavController) {
 
             Spacer(modifier = Modifier.height(25.dp))
 
-            // Today's Content Header
+            // Today's Content Section
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text("TODAY'S CONTENT", color = Color.White, fontWeight = FontWeight.Bold)
                 IconButton(
@@ -101,10 +141,14 @@ fun CalendarScreen(navController: NavController) {
 
             Spacer(modifier = Modifier.height(15.dp))
 
-            // Content List
+            // FIXED CONTENT LIST WITH PLATFORM ICONS
             LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                item { ContentItem(navController, "March 23", "8:00 AM", R.drawable.logo, "Instagram", "Summer launch!") }
-                item { ContentItem(navController, "March 25", "11:30 AM", R.drawable.logo, "TikTok", "Behind the Scenes") }
+                item {
+                    ContentItem(navController, "March 23", "8:00 AM", R.drawable.ic_instagram, "Instagram", "Summer launch!")
+                }
+                item {
+                    ContentItem(navController, "March 25", "11:30 AM", R.drawable.ic_tiktok, "TikTok", "Behind the Scenes")
+                }
             }
             Spacer(modifier = Modifier.height(80.dp))
         }
@@ -121,18 +165,28 @@ fun ContentItem(navController: NavController, date: String, time: String, iconRe
         colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.1f))
     ) {
         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(65.dp)) {
                 Text(date, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 Text(time, color = Color.White.copy(alpha = 0.6f), fontSize = 10.sp)
             }
             Spacer(modifier = Modifier.width(16.dp))
-            Box(modifier = Modifier.size(40.dp).background(Color.White.copy(alpha = 0.1f), RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
-                Image(painter = painterResource(id = iconRes), contentDescription = null, modifier = Modifier.size(24.dp))
+
+            // Icon Container
+            Box(
+                modifier = Modifier.size(45.dp).background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(10.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Image(
+                    painter = painterResource(id = iconRes),
+                    contentDescription = null,
+                    modifier = Modifier.size(26.dp)
+                )
             }
+
             Spacer(modifier = Modifier.width(12.dp))
             Column {
                 Text(platform, color = Color(0xFF5AB9C1), fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text(title, color = Color.White, fontSize = 13.sp)
+                Text(title, color = Color.White, fontSize = 13.sp, maxLines = 1)
             }
         }
     }

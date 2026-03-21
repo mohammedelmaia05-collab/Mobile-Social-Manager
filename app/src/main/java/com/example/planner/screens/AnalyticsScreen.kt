@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ViewColumn
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -124,6 +126,31 @@ fun AnalyticsScreen(navController: NavController) {
             // --- END CHART AREA ---
 
             Spacer(modifier = Modifier.height(24.dp))
+
+            // --- NEW: MANAGE WORKFLOW BUTTON ---
+            Button(
+                onClick = { navController.navigate("workflow") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(55.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF5AB9C1))
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ViewColumn,
+                    contentDescription = null,
+                    tint = Color(0xFF002B36)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    "Manage Full Workflow",
+                    color = Color(0xFF002B36),
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 16.sp
+                )
+            }
+
+            Spacer(modifier = Modifier.height(30.dp))
 
             // Platform Distribution
             Text("PLATFORMS DISTRIBUTION", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)

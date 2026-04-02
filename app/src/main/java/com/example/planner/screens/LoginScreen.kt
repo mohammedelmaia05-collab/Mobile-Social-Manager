@@ -1,6 +1,7 @@
 package com.example.planner.screens
 
 import android.app.Activity
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -38,9 +39,8 @@ fun LoginScreen(navController: NavController) {
     var isLoading by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
-    // --- GOOGLE SIGN IN LOGIC ---
-    // Get your Web Client ID from Firebase Console -> Authentication -> Google Provider
-    val webClientId = "810844623946-n6v3o88rk0qs5phca1fark3g95il1ddh.apps.googleusercontent.com"
+    // --- IMPORTANT: Ensure this matches Client Type 3 in your google-services.json ---
+    val webClientId = "810844623946-4afrhfv2qa4fvgk2267k3n9u6pem69q7.apps.googleusercontent.com"
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -49,23 +49,36 @@ fun LoginScreen(navController: NavController) {
             val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
             try {
                 val account = task.getResult(ApiException::class.java)
-                val credential = GoogleAuthProvider.getCredential(account.idToken, null)
-                auth.signInWithCredential(credential)
-                    .addOnSuccessListener {
-                        navController.navigate("calendar") {
-                            popUpTo("login") { inclusive = true }
+                val idToken = account.idToken
+
+                if (idToken != null) {
+                    val credential = GoogleAuthProvider.getCredential(idToken, null)
+                    auth.signInWithCredential(credential)
+                        .addOnSuccessListener {
+                            Toast.makeText(context, "Welcome ${it.user?.displayName}", Toast.LENGTH_SHORT).show()
+                            navController.navigate("calendar") {
+                                popUpTo("login") { inclusive = true }
+                            }
                         }
-                    }
-                    .addOnFailureListener {
-                        isLoading = false
-                        Toast.makeText(context, "Firebase Auth Failed: ${it.message}", Toast.LENGTH_SHORT).show()
-                    }
+                        .addOnFailureListener {
+                            isLoading = false
+                            Log.e("FirebaseAuth", "Auth failed", it)
+                            Toast.makeText(context, "Firebase Auth Failed: ${it.localizedMessage}", Toast.LENGTH_LONG).show()
+                        }
+                } else {
+                    isLoading = false
+                    Toast.makeText(context, "Error: Google ID Token is null", Toast.LENGTH_LONG).show()
+                }
             } catch (e: ApiException) {
                 isLoading = false
-                Toast.makeText(context, "Google Sign-In Failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                Log.e("GoogleSignIn", "Code: ${e.statusCode}", e)
+                // If this says Code: 10, your SHA-1 or WebClientId is wrong.
+                Toast.makeText(context, "Google Error Code: ${e.statusCode}", Toast.LENGTH_LONG).show()
             }
         } else {
             isLoading = false
+            // This happens if the user closes the account picker without choosing
+            Toast.makeText(context, "Sign-in cancelled", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -97,14 +110,12 @@ fun LoginScreen(navController: NavController) {
             Text("Login", color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(40.dp))
 
-            // Email & Password Fields (Keep your PlannerInputField component)
             PlannerInputField(value = email, onValueChange = { email = it }, placeholder = "Email Address")
             Spacer(modifier = Modifier.height(16.dp))
             PlannerInputField(value = password, onValueChange = { password = it }, placeholder = "Password", isPassword = true)
 
             Spacer(modifier = Modifier.height(30.dp))
 
-            // Login Button
             Button(
                 onClick = {
                     if (email.isNotEmpty() && password.isNotEmpty()) {
@@ -122,7 +133,7 @@ fun LoginScreen(navController: NavController) {
                     }
                 },
                 modifier = Modifier.fillMaxWidth().height(55.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF5AB9C1)), // Teal to match your theme
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF5AB9C1)),
                 shape = RoundedCornerShape(12.dp),
                 enabled = !isLoading
             ) {
@@ -133,20 +144,21 @@ fun LoginScreen(navController: NavController) {
             Spacer(modifier = Modifier.height(24.dp))
             Text("or login with", color = Color.White.copy(alpha = 0.7f))
 
-            // Social Icons Row
             Row(
                 modifier = Modifier.padding(top = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(20.dp)
             ) {
-                // FIXED GOOGLE BUTTON
                 Box(modifier = Modifier.clickable {
-                    isLoading = true
-                    val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                        .requestIdToken(webClientId)
-                        .requestEmail()
-                        .build()
-                    val client = GoogleSignIn.getClient(context, gso)
-                    launcher.launch(client.signInIntent)
+                    if (!isLoading) {
+                        isLoading = true
+                        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                            .requestIdToken(webClientId)
+                            .requestEmail()
+                            .build()
+                        val client = GoogleSignIn.getClient(context, gso)
+                        // This opens the UI shown in your video
+                        launcher.launch(client.signInIntent)
+                    }
                 }) {
                     SocialButton(icon = R.drawable.google)
                 }

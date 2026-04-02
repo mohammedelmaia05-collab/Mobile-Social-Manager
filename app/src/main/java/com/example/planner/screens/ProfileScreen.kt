@@ -31,18 +31,27 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import com.cloudinary.android.MediaManager
+import com.cloudinary.android.callback.ErrorInfo
+import com.cloudinary.android.callback.UploadCallback
 import com.example.planner.R
 import com.example.planner.components.BottomNavBar
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.storage.FirebaseStorage
 
 @Composable
 fun ProfileScreen(navController: NavController) {
     val auth = FirebaseAuth.getInstance()
     val db = FirebaseFirestore.getInstance()
-    val storage = FirebaseStorage.getInstance()
     val context = LocalContext.current
+
+    val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+        .requestIdToken("810844623946-n6v3o88rk0qs5phca1fark3g95il1ddh.apps.googleusercontent.com")
+        .requestEmail()
+        .build()
+    val googleSignInClient = GoogleSignIn.getClient(context, gso)
 
     var userName by remember { mutableStateOf("Mohammed Elamaia") }
     var userRole by remember { mutableStateOf("Digital Developer") }
@@ -71,24 +80,36 @@ fun ProfileScreen(navController: NavController) {
             imageUri = it
             isUploading = true
             val userId = auth.currentUser?.uid
+
             if (userId != null) {
-                val storageRef = storage.reference.child("profile_images/$userId.jpg")
-                storageRef.putFile(it)
-                    .addOnSuccessListener {
-                        storageRef.downloadUrl.addOnSuccessListener { downloadUrl ->
+                // CLOUDINARY UPLOAD LOGIC WITH PRESET
+                MediaManager.get().upload(it)
+                    .option("public_id", "profile_$userId")
+                    .option("upload_preset", "planner") // Using your 'planner' preset from screenshot
+                    .callback(object : UploadCallback {
+                        override fun onStart(requestId: String?) {}
+
+                        override fun onProgress(requestId: String?, bytes: Long, totalBytes: Long) {}
+
+                        override fun onSuccess(requestId: String?, resultData: Map<*, *>?) {
+                            val downloadUrl = resultData?.get("secure_url").toString()
+
                             db.collection("users").document(userId)
-                                .update("profileImage", downloadUrl.toString())
+                                .update("profileImage", downloadUrl)
                                 .addOnSuccessListener {
                                     isUploading = false
-                                    savedImageUrl = downloadUrl.toString()
-                                    Toast.makeText(context, "Profile picture saved!", Toast.LENGTH_SHORT).show()
+                                    savedImageUrl = downloadUrl
+                                    Toast.makeText(context, "Profile updated!", Toast.LENGTH_SHORT).show()
                                 }
                         }
-                    }
-                    .addOnFailureListener { e ->
-                        isUploading = false
-                        Toast.makeText(context, "Upload failed: ${e.message}", Toast.LENGTH_SHORT).show()
-                    }
+
+                        override fun onError(requestId: String?, error: ErrorInfo?) {
+                            isUploading = false
+                            Toast.makeText(context, "Upload Error: ${error?.description}", Toast.LENGTH_LONG).show()
+                        }
+
+                        override fun onReschedule(requestId: String?, error: ErrorInfo?) {}
+                    }).dispatch()
             }
         }
     }
@@ -121,16 +142,16 @@ fun ProfileScreen(navController: NavController) {
                             .clickable { galleryLauncher.launch("image/*") },
                         contentAlignment = Alignment.Center
                     ) {
-                        if (imageUri != null) {
-                            AsyncImage(model = imageUri, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().clip(CircleShape))
-                        } else if (savedImageUrl != null) {
-                            AsyncImage(model = savedImageUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().clip(CircleShape))
-                        } else {
-                            Image(painter = painterResource(id = R.drawable.logo), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().clip(CircleShape))
-                        }
-
                         if (isUploading) {
                             CircularProgressIndicator(modifier = Modifier.size(40.dp), color = Color(0xFF5AB9C1))
+                        } else {
+                            if (imageUri != null) {
+                                AsyncImage(model = imageUri, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().clip(CircleShape))
+                            } else if (savedImageUrl != null) {
+                                AsyncImage(model = savedImageUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().clip(CircleShape))
+                            } else {
+                                Image(painter = painterResource(id = R.drawable.logo), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().clip(CircleShape))
+                            }
                         }
 
                         Box(modifier = Modifier.align(Alignment.BottomEnd).background(Color(0xFF5AB9C1), CircleShape).padding(6.dp)) {
@@ -167,8 +188,10 @@ fun ProfileScreen(navController: NavController) {
             Button(
                 onClick = {
                     auth.signOut()
-                    navController.navigate("login") {
-                        popUpTo("welcome") { inclusive = true }
+                    googleSignInClient.signOut().addOnCompleteListener {
+                        navController.navigate("login") {
+                            popUpTo(0) { inclusive = true }
+                        }
                     }
                 },
                 modifier = Modifier.fillMaxWidth().height(50.dp).padding(bottom = 8.dp),

@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -59,4 +60,17 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     implementation("androidx.navigation:navigation-compose:2.7.7")
     implementation("androidx.compose.material:material-icons-extended")
+    implementation("io.coil-kt:coil-compose:2.6.0")
+    implementation(platform("com.google.firebase:firebase-bom:33.1.0"))
+    implementation("com.google.firebase:firebase-auth-ktx")      // Login
+    implementation("com.google.firebase:firebase-firestore-ktx") // Database
+    implementation("com.google.firebase:firebase-storage-ktx")   // Images
+    implementation("com.google.firebase:firebase-analytics")
+    implementation("com.google.firebase:firebase-storage:20.3.0")
+    implementation("com.cloudinary:cloudinary-android:3.0.2")
+    implementation("com.airbnb.android:lottie-compose:6.4.0")
+    implementation("com.google.ai.client.generativeai:generativeai:0.7.0")
+    implementation("com.google.firebase:firebase-auth-ktx")
+    implementation("com.google.android.gms:play-services-auth:21.0.0")
+
 }

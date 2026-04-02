@@ -1,5 +1,9 @@
 package com.example.planner.screens
 
+import android.net.Uri
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -12,26 +16,85 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import coil.compose.AsyncImage
 import com.example.planner.R
 import com.example.planner.components.BottomNavBar
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.storage.FirebaseStorage
 
 @Composable
 fun ProfileScreen(navController: NavController) {
+    val auth = FirebaseAuth.getInstance()
+    val db = FirebaseFirestore.getInstance()
+    val storage = FirebaseStorage.getInstance()
+    val context = LocalContext.current
+
+    var userName by remember { mutableStateOf("Mohammed Elamaia") }
+    var userRole by remember { mutableStateOf("Digital Developer") }
+    var imageUri by remember { mutableStateOf<Uri?>(null) }
+    var savedImageUrl by remember { mutableStateOf<String?>(null) }
+    var isUploading by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        val userId = auth.currentUser?.uid
+        if (userId != null) {
+            db.collection("users").document(userId).get()
+                .addOnSuccessListener { document ->
+                    if (document.exists()) {
+                        userName = document.getString("name") ?: "Mohammed Elamaia"
+                        userRole = document.getString("role") ?: "Digital Developer"
+                        savedImageUrl = document.getString("profileImage")
+                    }
+                }
+        }
+    }
+
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            imageUri = it
+            isUploading = true
+            val userId = auth.currentUser?.uid
+            if (userId != null) {
+                val storageRef = storage.reference.child("profile_images/$userId.jpg")
+                storageRef.putFile(it)
+                    .addOnSuccessListener {
+                        storageRef.downloadUrl.addOnSuccessListener { downloadUrl ->
+                            db.collection("users").document(userId)
+                                .update("profileImage", downloadUrl.toString())
+                                .addOnSuccessListener {
+                                    isUploading = false
+                                    savedImageUrl = downloadUrl.toString()
+                                    Toast.makeText(context, "Profile picture saved!", Toast.LENGTH_SHORT).show()
+                                }
+                        }
+                    }
+                    .addOnFailureListener { e ->
+                        isUploading = false
+                        Toast.makeText(context, "Upload failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+            }
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF002B36), Color(0xFF005F73))))) {
         Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-            // Header
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = { navController.popBackStack() }) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBackIos, contentDescription = null, tint = Color.White)
@@ -41,7 +104,6 @@ fun ProfileScreen(navController: NavController) {
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // User Profile Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp),
@@ -51,23 +113,39 @@ fun ProfileScreen(navController: NavController) {
                     modifier = Modifier.fillMaxWidth().padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Box(modifier = Modifier.size(100.dp).background(Color.Gray, CircleShape)) {
-                        Image(
-                            painter = painterResource(id = R.drawable.logo),
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                        )
+                    Box(
+                        modifier = Modifier
+                            .size(100.dp)
+                            .clip(CircleShape)
+                            .background(Color.Gray.copy(alpha = 0.2f), CircleShape)
+                            .clickable { galleryLauncher.launch("image/*") },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (imageUri != null) {
+                            AsyncImage(model = imageUri, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().clip(CircleShape))
+                        } else if (savedImageUrl != null) {
+                            AsyncImage(model = savedImageUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().clip(CircleShape))
+                        } else {
+                            Image(painter = painterResource(id = R.drawable.logo), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().clip(CircleShape))
+                        }
+
+                        if (isUploading) {
+                            CircularProgressIndicator(modifier = Modifier.size(40.dp), color = Color(0xFF5AB9C1))
+                        }
+
+                        Box(modifier = Modifier.align(Alignment.BottomEnd).background(Color(0xFF5AB9C1), CircleShape).padding(6.dp)) {
+                            Icon(Icons.Default.Edit, contentDescription = null, tint = Color(0xFF002B36), modifier = Modifier.size(16.dp))
+                        }
                     }
+
                     Spacer(modifier = Modifier.height(12.dp))
-                    Text("Mohammed Elamaia", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                    Text("Digital Developer", color = Color.White.copy(alpha = 0.6f), fontSize = 14.sp)
+                    Text(userName, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Text(userRole, color = Color.White.copy(alpha = 0.6f), fontSize = 14.sp)
                 }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Settings Sections
             Text("Account Settings", color = Color(0xFF5AB9C1), fontWeight = FontWeight.Bold, fontSize = 14.sp)
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -86,14 +164,14 @@ fun ProfileScreen(navController: NavController) {
 
             Spacer(modifier = Modifier.weight(1f))
 
-            // Logout Button - Fixed logic to clear backstack
             Button(
                 onClick = {
+                    auth.signOut()
                     navController.navigate("login") {
                         popUpTo("welcome") { inclusive = true }
                     }
                 },
-                modifier = Modifier.fillMaxWidth().height(50.dp),
+                modifier = Modifier.fillMaxWidth().height(50.dp).padding(bottom = 8.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB00020)),
                 shape = RoundedCornerShape(12.dp)
             ) {
@@ -101,9 +179,11 @@ fun ProfileScreen(navController: NavController) {
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Logout", color = Color.White, fontWeight = FontWeight.Bold)
             }
-            Spacer(modifier = Modifier.height(80.dp)) // Nav bar space
+            Spacer(modifier = Modifier.height(80.dp))
         }
-        Box(modifier = Modifier.align(Alignment.BottomCenter)) { BottomNavBar(navController) }
+        Box(modifier = Modifier.align(Alignment.BottomCenter)) {
+            BottomNavBar(navController)
+        }
     }
 }
 
@@ -111,7 +191,10 @@ fun ProfileScreen(navController: NavController) {
 fun SettingsRow(icon: ImageVector, title: String, onClick: () -> Unit) {
     Column {
         Row(
-            modifier = Modifier.fillMaxWidth().clickable { onClick() }.padding(vertical = 12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onClick() }
+                .padding(vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
